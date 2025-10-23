@@ -18,29 +18,46 @@ import argparse
 class GeminiAPICaller:
     """Calls Gemini API with converted requests."""
     
-    def __init__(self, credentials=None, fc2=True, function_call_mode="auto"):
+    def __init__(self, credentials=None, fc2=True, function_call_mode="auto", project="cloud-llm-preview4",
+                 model_name="gemini-2.5-pro", openai_endpoint=False, location="global"):
         """
         Initialize the Gemini API caller.
-        
+
         Args:
             credentials: Google Cloud credentials object (optional)
             fc2: Use cloud-llm-preview4 if True, cloud-llm-preview1 if False (default: True)
             function_call_mode: Function calling mode - "auto", "any", "validated" (default: "auto")
+            project: GCP project ID (default: "cloud-llm-preview4")
+            model_name: Model name to use (default: "gemini-2.5-pro")
+            openai_endpoint: Use OpenAI-compatible endpoint if True (default: False)
+            location: GCP location/region (default: "global")
         """
-        # if fc2:
-        #     if function_call_mode == "validated":
-        #         self.base_url = "https://aiplatform.googleapis.com/v1beta1/projects/cloud-llm-preview4/locations/global/publishers/google/models/gemini-2.5-pro:generateContent"
-        #     else:
-        #         self.base_url = "https://aiplatform.googleapis.com/v1/projects/cloud-llm-preview4/locations/global/publishers/google/models/gemini-2.5-pro:generateContent"
-        # else:
-        #     self.base_url = "https://aiplatform.googleapis.com/v1/projects/cloud-llm-preview1/locations/global/publishers/google/models/gemini-2.5-pro:generateContent"
+        self.project = project
+        self.model_name = model_name
+        self.openai_endpoint = openai_endpoint
+        self.location = location
+
+        # Determine the base domain based on location
+        if location == "global":
+            base_domain = "https://aiplatform.googleapis.com"
+        else:
+            base_domain = f"https://{location}-aiplatform.googleapis.com"
+
+        # Determine API version based on fc2 and function_call_mode
         if fc2:
             if function_call_mode == "validated":
-                self.base_url = "https://aiplatform.googleapis.com/v1beta1/projects/agent-sp-474006/locations/global/publishers/google/models/gemini-2.5-pro:generateContent"
+                api_version = "v1beta1"
             else:
-                self.base_url = "https://aiplatform.googleapis.com/v1/projects/agent-sp-474006/locations/global/publishers/google/models/gemini-2.5-pro:generateContent"
+                api_version = "v1"
         else:
-            self.base_url = "https://aiplatform.googleapis.com/v1/projects/agent-sp-474006/locations/global/publishers/google/models/gemini-2.5-pro:generateContent"
+            api_version = "v1"
+
+        # Build base URL based on endpoint type
+        if openai_endpoint:
+            self.base_url = f"{base_domain}/{api_version}/projects/{project}/locations/{location}/endpoints/openapi/chat/completions"
+        else:
+            self.base_url = f"{base_domain}/{api_version}/projects/{project}/locations/{location}/publishers/google/models/{model_name}:generateContent"
+
         self.credentials = credentials
         self.api_key = None  # Will be set when needed
         self.fc2 = fc2  # Store fc2 setting for labels
@@ -135,7 +152,11 @@ class GeminiAPICaller:
         try:
             # Fix known issues in the request before processing
             # fixed_request = self.fix_request_issues(request)
-            
+
+            # Add model field for OpenAI endpoint
+            if self.openai_endpoint:
+                request['model'] = f"google/{self.model_name}"
+
             # Add toolConfig based on function_call_mode
             if 'tools' in request and function_call_mode != "auto":
                 request['toolConfig'] = {
@@ -143,7 +164,7 @@ class GeminiAPICaller:
                         "mode": function_call_mode.upper()
                     }
                 }
-            
+
             # Add generationConfig with thinking budget if specified
             if thinking_budget > 0:
                 request['generationConfig'] = {
@@ -189,49 +210,79 @@ class GeminiAPICaller:
             
             # Parse the response
             response_data = response.json()
-            
-            # Extract the generated text from the response
-            generated_text = ""
-            finish_reason = "STOP"
-            
-            if "candidates" in response_data and response_data["candidates"]:
-                candidate = response_data["candidates"][0]
-                
-                # Extract text from content parts
-                if "content" in candidate and "parts" in candidate["content"]:
-                    for part in candidate["content"]["parts"]:
-                        if "text" in part:
-                            generated_text += part["text"]
-                
-                # Get finish reason
-                if "finishReason" in candidate:
-                    finish_reason = candidate["finishReason"]
-            
-            # Check for prompt feedback issues
-            if "promptFeedback" in response_data:
-                feedback = response_data["promptFeedback"]
-                if "blockReason" in feedback:
+
+            # Handle OpenAI endpoint response format
+            if self.openai_endpoint:
+                # OpenAI format has 'choices' instead of 'candidates'
+                if "choices" in response_data and response_data["choices"]:
+                    choice = response_data["choices"][0]
+
+                    # Format successful response in OpenAI format
+                    result = {
+                        "response": choice,
+                        "model": response_data.get("model", self.model_name),
+                        "finish_reason": choice.get("finish_reason", "stop"),
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+                        # "raw_response": response_data
+                    }
+
+                    # Add usage metadata if available
+                    if "usage" in response_data:
+                        result["usage"] = response_data["usage"]
+
+                    return result
+                else:
                     return {
-                        "error": f"Prompt was blocked: {feedback['blockReason']}",
-                        "error_type": "PromptBlocked",
+                        "error": "No choices in OpenAI response",
+                        "error_type": "InvalidResponse",
                         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
                         "raw_response": response_data
                     }
-            
-            # Format successful response
-            result = {
-                "response": response_data["candidates"][0],
-                "model": "gemini-2.5-pro",
-                "finish_reason": finish_reason,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
-                # "raw_response":response_data
-            }
-            
-            # Add usage metadata if available
-            if "usageMetadata" in response_data:
-                result["usage"] = response_data["usageMetadata"]
-            
-            return result
+
+            # Handle Gemini endpoint response format
+            else:
+                # Extract the generated text from the response
+                generated_text = ""
+                finish_reason = "STOP"
+
+                if "candidates" in response_data and response_data["candidates"]:
+                    candidate = response_data["candidates"][0]
+
+                    # Extract text from content parts
+                    if "content" in candidate and "parts" in candidate["content"]:
+                        for part in candidate["content"]["parts"]:
+                            if "text" in part:
+                                generated_text += part["text"]
+
+                    # Get finish reason
+                    if "finishReason" in candidate:
+                        finish_reason = candidate["finishReason"]
+
+                # Check for prompt feedback issues
+                if "promptFeedback" in response_data:
+                    feedback = response_data["promptFeedback"]
+                    if "blockReason" in feedback:
+                        return {
+                            "error": f"Prompt was blocked: {feedback['blockReason']}",
+                            "error_type": "PromptBlocked",
+                            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+                            "raw_response": response_data
+                        }
+
+                # Format successful response
+                result = {
+                    "response": response_data["candidates"][0],
+                    "model": "gemini-2.5-pro",
+                    "finish_reason": finish_reason,
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+                    # "raw_response":response_data
+                }
+
+                # Add usage metadata if available
+                if "usageMetadata" in response_data:
+                    result["usage"] = response_data["usageMetadata"]
+
+                return result
             
         except requests.exceptions.HTTPError as e:
             # Handle HTTP errors
@@ -392,9 +443,9 @@ def main():
     """Main function to process Gemini requests."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Process Gemini API requests')
-    parser.add_argument('--input-folder', default="agentic_data_demo/input_gemini",
+    parser.add_argument('--input-folder', default="claude_request_to_gemini",
                         help='Input folder containing Gemini request JSON files')
-    parser.add_argument('--output-folder', default="agentic_data_demo/output_gemini",
+    parser.add_argument('--output-folder', default="claude_request_to_gemini_output",
                         help='Output folder for results')
     parser.add_argument('--iterations', type=int, default=1,
                         help='Number of iterations to process all requests')
@@ -405,7 +456,15 @@ def main():
                         help='Use cloud-llm-preview4 project (default: False, uses cloud-llm-preview1)')
     parser.add_argument('--thinking-budget', type=int, default=0,
                         help='Thinking budget value. If 0, generationConfig is not added (default: 0)')
-    
+    parser.add_argument('--project', type=str, default='cloud-llm-preview4',
+                        help='GCP project ID (default: cloud-llm-preview4)')
+    parser.add_argument('--model-name', type=str, default='gemini-2.5-pro',
+                        help='Model name to use (default: gemini-2.5-pro)')
+    parser.add_argument('--openai-endpoint', type=str2bool, default=False,
+                        help='Use OpenAI-compatible endpoint (default: False)')
+    parser.add_argument('--location', type=str, default='global',
+                        help='GCP location/region (default: global)')
+
     args = parser.parse_args()
     
     import google.auth
@@ -417,15 +476,21 @@ def main():
     function_call_mode = args.function_call_mode
     fc2 = args.fc2
     thinking_budget = args.thinking_budget
-    
+    project = args.project
+    model_name = args.model_name
+    openai_endpoint = args.openai_endpoint
+    location = args.location
+
     # Check if input folder exists
     if not os.path.exists(input_folder):
         print(f"Error: Input folder '{input_folder}' not found!")
         print("Please make sure the input_gemini folder exists with converted requests.")
         return
-    
+
     # Create API caller instance with credentials
-    caller = GeminiAPICaller(credentials=credentials, fc2=fc2, function_call_mode=function_call_mode)
+    caller = GeminiAPICaller(credentials=credentials, fc2=fc2, function_call_mode=function_call_mode,
+                            project=project, model_name=model_name, openai_endpoint=openai_endpoint,
+                            location=location)
     
     # Process all files for each iteration
     print(f"Processing files from: {input_folder}")
@@ -434,7 +499,11 @@ def main():
     print(f"Function call mode: {function_call_mode}")
     print(f"FC2 mode: {fc2}")
     print(f"Thinking budget: {thinking_budget}")
-    print("Using Gemini 2.5 Pro via AI Platform endpoint")
+    print(f"Project: {project}")
+    print(f"Model: {model_name}")
+    print(f"Location: {location}")
+    print(f"OpenAI endpoint: {openai_endpoint}")
+    print(f"Base URL: {caller.base_url}")
     
     for iteration in range(1, iterations + 1):
         print(f"\n{'='*80}")

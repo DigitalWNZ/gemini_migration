@@ -51,10 +51,10 @@ This script converts API requests from Claude's format to OpenAI's format.
 {
 "role": "tool",
 "tool_call_id": "...",
-"name": "function_name", (extracted from content pattern)
+"name": "function_name",
 "content": "..."
 }
-- Note: The function name is extracted from the content using regex pattern: Observation of Tool \{function_name}`
+- Note: The function name is retrieved from the matching tool_use message with the same id
 
 4. Tools/Functions Definition
 
@@ -75,6 +75,7 @@ This script converts API requests from Claude's format to OpenAI's format.
 }
 """
 
+import argparse
 import json
 import os
 import glob
@@ -107,6 +108,17 @@ class ClaudeToOpenAIConverter:
         OpenAI format: {"role": "user/assistant/system", "content": "text"}
         """
         openai_messages = []
+
+        # Build a mapping of tool_use_id to function name from assistant messages
+        tool_use_map = {}
+        for message in claude_messages:
+            if message.get("role") == "assistant" and isinstance(message.get("content"), list):
+                for item in message["content"]:
+                    if isinstance(item, dict) and item.get("type") == "tool_use":
+                        tool_use_id = item.get("id")
+                        function_name = item.get("name")
+                        if tool_use_id and function_name:
+                            tool_use_map[tool_use_id] = function_name
 
         for message in claude_messages:
             role = message.get("role", "")
@@ -197,14 +209,13 @@ class ClaudeToOpenAIConverter:
                 if tool_results:
                     for tool_result in tool_results:
                         content_str = tool_result.get("content", "")
-                        # Extract function name from content using pattern: Observation of Tool `{function_name}`
-                        import re
-                        match = re.search(r'Observation of Tool `([^`]+)`', content_str)
-                        tool_name = match.group(1) if match else ""
+                        # Get function name from the tool_use_map using tool_use_id
+                        tool_use_id = tool_result.get("tool_use_id", "")
+                        tool_name = tool_use_map.get(tool_use_id, "unknown")
 
                         openai_messages.append({
                             "role": "tool",
-                            "tool_call_id": tool_result.get("tool_use_id", ""),
+                            "tool_call_id": tool_use_id,
                             "name": tool_name,
                             "content": content_str
                         })
@@ -352,9 +363,7 @@ class ClaudeToOpenAIConverter:
             output_folder: Path to the output folder (defaults to input_openai)
         """
         if output_folder is None:
-            # Extract the parent directory of input_folder
-            parent_dir = os.path.dirname(input_folder)
-            output_folder = os.path.join(parent_dir, "input_openai")
+            output_folder = input_folder + "_to_openai"
 
         # Find all JSON files recursively
         json_files = glob.glob(os.path.join(input_folder, "**/*.json"), recursive=True)
@@ -403,8 +412,16 @@ class ClaudeToOpenAIConverter:
 
 
 def main():
-    """Process all JSON files in the agentic_data_demo/input folder."""
-    input_folder = "agentic_data_demo/input"
+    """Process all JSON files in the specified input folder."""
+    parser = argparse.ArgumentParser(description='Convert Claude API requests to OpenAI format')
+    parser.add_argument('--input_folder', type=str, default='claude_request',
+                        help='Input folder containing Claude request JSON files (default: claude_request)')
+    parser.add_argument('--output_folder', type=str, default=None,
+                        help='Output folder for converted files (default: <input_folder>_to_openai)')
+
+    args = parser.parse_args()
+    input_folder = args.input_folder
+    output_folder = args.output_folder
 
     # Check if input folder exists
     if not os.path.exists(input_folder):
@@ -416,24 +433,7 @@ def main():
     converter = ClaudeToOpenAIConverter()
 
     # Process all files in the folder
-    converter.process_folder(input_folder)
-
-    # Example of converting a single file
-    print("\n" + "="*50 + "\n")
-    print("Example of single file conversion:")
-
-    # Get the output folder path
-    output_folder = "agentic_data_demo/input_openai"
-    sample_files = glob.glob(os.path.join(output_folder, "**/*_openai.json"), recursive=True)
-    if sample_files:
-        sample_file = sample_files[0]
-        print(f"\nConverted sample file: {sample_file}")
-
-        with open(sample_file, 'r', encoding='utf-8') as f:
-            openai_request = json.load(f)
-
-        print("\nConverted OpenAI Request (first 50 lines):")
-        print(json.dumps(openai_request, indent=2)[:2000] + "...")
+    converter.process_folder(input_folder, output_folder)
 
 
 if __name__ == "__main__":

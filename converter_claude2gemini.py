@@ -69,7 +69,7 @@ This script converts API requests from Claude's format to Gemini's format.
       }
     }]
   }
-    - Function name is extracted from content using regex: Observation of Tool \{function_name}`
+    - Function name is retrieved from the matching tool_use message with the same id
     - Content wrapped in response.result
 
   5. Tools/Functions Definition
@@ -102,6 +102,7 @@ This script converts API requests from Claude's format to Gemini's format.
     - Model and other parameters not included
 """
 
+import argparse
 import json
 import os
 import glob
@@ -130,12 +131,23 @@ class ClaudeToGeminiConverter:
     def convert_messages(self, claude_messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Convert Claude message format to Gemini format.
-        
+
         Claude format: {"role": "user/assistant/tool", "content": "text"}
         Gemini format: {"role": "user/model", "parts": [{"text": "text"}]}
         """
         gemini_messages = []
-        
+
+        # Build a mapping of tool_use_id to function name from assistant messages
+        tool_use_map = {}
+        for message in claude_messages:
+            if message.get("role") == "assistant" and isinstance(message.get("content"), list):
+                for item in message["content"]:
+                    if isinstance(item, dict) and item.get("type") == "tool_use":
+                        tool_use_id = item.get("id")
+                        function_name = item.get("name")
+                        if tool_use_id and function_name:
+                            tool_use_map[tool_use_id] = function_name
+
         for message in claude_messages:
             role = message.get("role", "")
             content = message.get("content", "")
@@ -199,9 +211,9 @@ class ClaudeToGeminiConverter:
                             # Handle tool results
                             # Extract the "content" object
                             content = item.get('content', '')
-                            # Extract function name from the content value, the pattern is "Observation of Tool `{function name}`"
-                            match = re.search(r'Observation of Tool `([^`]+)`', content)
-                            function_name = match.group(1) if match else 'unknown'
+                            # Get function name from the tool_use_map using tool_use_id
+                            tool_use_id = item.get('tool_use_id')
+                            function_name = tool_use_map.get(tool_use_id, 'unknown')
                             # Change "content" to "response" and embrace both name and response in "functionResponse" object
                             parts.append({
                                 "functionResponse": {
@@ -375,9 +387,7 @@ class ClaudeToGeminiConverter:
             output_folder: Path to the output folder (defaults to input_gemini)
         """
         if output_folder is None:
-            # Extract the parent directory of input_folder
-            parent_dir = os.path.dirname(input_folder)
-            output_folder = os.path.join(parent_dir, "input_gemini")
+            output_folder = input_folder + "_to_gemini"
         
         # Find all JSON files recursively
         json_files = glob.glob(os.path.join(input_folder, "**/*.json"), recursive=True)
@@ -426,37 +436,28 @@ class ClaudeToGeminiConverter:
 
 
 def main():
-    """Process all JSON files in the agentic_data_demo/input folder."""
-    input_folder = "agentic_data_demo/input"
-    
+    """Process all JSON files in the specified input folder."""
+    parser = argparse.ArgumentParser(description='Convert Claude API requests to Gemini format')
+    parser.add_argument('--input_folder', type=str, default='claude_request',
+                        help='Input folder containing Claude request JSON files (default: claude_request)')
+    parser.add_argument('--output_folder', type=str, default=None,
+                        help='Output folder for converted files (default: <input_folder>_to_gemini)')
+
+    args = parser.parse_args()
+    input_folder = args.input_folder
+    output_folder = args.output_folder
+
     # Check if input folder exists
     if not os.path.exists(input_folder):
         print(f"Error: Input folder '{input_folder}' not found!")
         print("Please make sure you're running the script from the correct directory.")
         return
-    
+
     # Create converter instance
     converter = ClaudeToGeminiConverter()
-    
+
     # Process all files in the folder
-    converter.process_folder(input_folder)
-    
-    # Example of converting a single file
-    print("\n" + "="*50 + "\n")
-    print("Example of single file conversion:")
-    
-    # Get the output folder path
-    output_folder = "agentic_data_demo/input_gemini_v1"
-    sample_files = glob.glob(os.path.join(output_folder, "**/*_gemini.json"), recursive=True)
-    if sample_files:
-        sample_file = sample_files[0]
-        print(f"\nConverted sample file: {sample_file}")
-        
-        with open(sample_file, 'r', encoding='utf-8') as f:
-            gemini_request = json.load(f)
-        
-        print("\nConverted Gemini Request:")
-        print(json.dumps(gemini_request, indent=2))
+    converter.process_folder(input_folder, output_folder)
 
 
 if __name__ == "__main__":

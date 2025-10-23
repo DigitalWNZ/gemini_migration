@@ -17,6 +17,7 @@ This script converts API requests from OpenAI's format to Gemini's format.
 - OpenAI tools with type: "function" and nested function → Gemini tools with functionDeclarations
 """
 
+import argparse
 import json
 import os
 import glob
@@ -44,6 +45,17 @@ class OpenAIToGeminiConverter:
         """
         gemini_contents = []
         system_instruction = None
+
+        # Build a mapping of tool_call_id to tool_name from tool_calls messages
+        tool_call_id_to_name = {}
+        for message in openai_messages:
+            if "tool_calls" in message and message["tool_calls"]:
+                for tool_call in message["tool_calls"]:
+                    tool_call_id = tool_call.get("id", "")
+                    function_data = tool_call.get("function", {})
+                    tool_name = function_data.get("name", "")
+                    if tool_call_id and tool_name:
+                        tool_call_id_to_name[tool_call_id] = tool_name
 
         for message in openai_messages:
             role = message.get("role", "")
@@ -97,7 +109,10 @@ class OpenAIToGeminiConverter:
             # Handle tool responses
             if role == "tool":
                 tool_call_id = message.get("tool_call_id", "")
+                # Try to get tool_name from message first, then from tool_call_id mapping
                 tool_name = message.get("name", "")
+                if not tool_name and tool_call_id:
+                    tool_name = tool_call_id_to_name.get(tool_call_id, "")
                 tool_content = content if isinstance(content, str) else str(content)
 
                 parts = [{
@@ -338,9 +353,7 @@ class OpenAIToGeminiConverter:
             output_folder: Path to the output folder (defaults to input_gemini_from_openai)
         """
         if output_folder is None:
-            # Extract the parent directory of input_folder
-            parent_dir = os.path.dirname(input_folder)
-            output_folder = os.path.join(parent_dir, "input_gemini_from_openai")
+            output_folder = input_folder + "_to_gemini"
 
         # Find all JSON files recursively
         json_files = glob.glob(os.path.join(input_folder, "**/*.json"), recursive=True)
@@ -394,8 +407,16 @@ class OpenAIToGeminiConverter:
 
 
 def main():
-    """Process all JSON files in the agentic_data_demo/input_openai folder."""
-    input_folder = "openai_request"
+    """Process all JSON files in the specified input folder."""
+    parser = argparse.ArgumentParser(description='Convert OpenAI API requests to Gemini format')
+    parser.add_argument('--input_folder', type=str, default='openai_request',
+                        help='Input folder containing OpenAI request JSON files (default: openai_request)')
+    parser.add_argument('--output_folder', type=str, default=None,
+                        help='Output folder for converted files (default: <input_folder>_to_gemini)')
+
+    args = parser.parse_args()
+    input_folder = args.input_folder
+    output_folder = args.output_folder
 
     # Check if input folder exists
     if not os.path.exists(input_folder):
@@ -407,24 +428,7 @@ def main():
     converter = OpenAIToGeminiConverter()
 
     # Process all files in the folder
-    converter.process_folder(input_folder)
-
-    # Example of converting a single file
-    print("\n" + "="*50 + "\n")
-    print("Example of single file conversion:")
-
-    # Get the output folder path
-    output_folder = "gemini_request"
-    sample_files = glob.glob(os.path.join(output_folder, "**/*_gemini_from_openai.json"), recursive=True)
-    if sample_files:
-        sample_file = sample_files[0]
-        print(f"\nConverted sample file: {sample_file}")
-
-        with open(sample_file, 'r', encoding='utf-8') as f:
-            gemini_request = json.load(f)
-
-        print("\nConverted Gemini Request (first 50 lines):")
-        print(json.dumps(gemini_request, indent=2)[:2000] + "...")
+    converter.process_folder(input_folder, output_folder)
 
 
 if __name__ == "__main__":
