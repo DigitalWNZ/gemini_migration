@@ -19,7 +19,7 @@ python3 converter_claude2gemini.py [--input_folder INPUT] [--output_folder OUTPU
 ```
 
 **Parameters:**
-- `--input_folder`: Input folder containing Claude request JSON files (default: `claude_request`)
+- `--input_folder`: Input folder containing Claude request JSON files (default: `claude_requests`)
 - `--output_folder`: Output folder for converted files (default: `<input_folder>_to_gemini`)
 
 **Features:**
@@ -41,7 +41,7 @@ python3 converter_claude2openai.py [--input_folder INPUT] [--output_folder OUTPU
 ```
 
 **Parameters:**
-- `--input_folder`: Input folder containing Claude request JSON files (default: `claude_request`)
+- `--input_folder`: Input folder containing Claude request JSON files (default: `claude_requests`)
 - `--output_folder`: Output folder for converted files (default: `<input_folder>_to_openai`)
 
 **Features:**
@@ -62,7 +62,7 @@ python3 converter_openai2gemini.py [--input_folder INPUT] [--output_folder OUTPU
 ```
 
 **Parameters:**
-- `--input_folder`: Input folder containing OpenAI request JSON files (default: `openai_request`)
+- `--input_folder`: Input folder containing OpenAI request JSON files (default: `openai_requests`)
 - `--output_folder`: Output folder for converted files (default: `<input_folder>_to_gemini`)
 
 **Features:**
@@ -87,8 +87,8 @@ python3 gemini_api_caller.py [OPTIONS]
 ```
 
 **Parameters:**
-- `--input-folder`: Input folder containing Gemini request JSON files (default: `claude_request_to_gemini`)
-- `--output-folder`: Output folder for results (default: `claude_request_to_gemini_output`)
+- `--input-folder`: Input folder containing Gemini request JSON files (default: `claude_requests_to_gemini`)
+- `--output-folder`: Output folder for results (default: `claude_requests_to_gemini_output`)
 - `--iterations`: Number of iterations to process all requests (default: `1`)
 - `--function-call-mode`: Function calling mode - `auto`, `any`, or `validated` (default: `auto`)
 - `--fc2`: Use cloud-llm-preview4 project (default: `False`)
@@ -134,9 +134,9 @@ Runs end-to-end evaluation with different Gemini API configurations.
 3. **FC2 validated mode**: `fc2=true`, `function-call-mode=validated`
 
 **Output:**
-- `claude_request_to_gemini_output_FC1/`
-- `claude_request_to_gemini_output_FC2/`
-- `claude_request_to_gemini_output_FC2_validate/`
+- `claude_requests_to_gemini_output_FC1/`
+- `claude_requests_to_gemini_output_FC2/`
+- `claude_requests_to_gemini_output_FC2_validate/`
 
 ---
 
@@ -154,17 +154,17 @@ Runs end-to-end evaluation with different Gemini API configurations.
 
 ### 1. Convert Claude requests to Gemini format
 ```bash
-python3 converter_claude2gemini.py --input_folder claude_request --output_folder claude_request_to_gemini
+python3 converter_claude2gemini.py --input_folder claude_requests --output_folder claude_requests_to_gemini
 ```
 
 ### 2. Convert Claude requests to OpenAI format
 ```bash
-python3 converter_claude2openai.py --input_folder claude_request --output_folder claude_request_to_openai
+python3 converter_claude2openai.py --input_folder claude_requests --output_folder claude_requests_to_openai
 ```
 
 ### 3. Convert OpenAI requests to Gemini format
 ```bash
-python3 converter_openai2gemini.py --input_folder openai_request --output_folder openai_request_to_gemini
+python3 converter_openai2gemini.py --input_folder openai_requests --output_folder openai_requests_to_gemini
 ```
 
 ### 4. Call Gemini API with converted requests
@@ -172,8 +172,8 @@ python3 converter_openai2gemini.py --input_folder openai_request --output_folder
 **Using Gemini native endpoint:**
 ```bash
 python3 gemini_api_caller.py \
-  --input-folder claude_request_to_gemini \
-  --output-folder claude_request_to_gemini_output \
+  --input-folder claude_requests_to_gemini \
+  --output-folder claude_requests_to_gemini_output \
   --fc2 true \
   --project cloud-llm-preview1
 ```
@@ -181,8 +181,8 @@ python3 gemini_api_caller.py \
 **Using OpenAI-compatible endpoint:**
 ```bash
 python3 gemini_api_caller.py \
-  --input-folder claude_request_to_openai \
-  --output-folder claude_request_to_openai_output \
+  --input-folder claude_requests_to_openai \
+  --output-folder claude_requests_to_openai_output \
   --fc2 true \
   --project cloud-llm-preview1 \
   --openai-endpoint true
@@ -200,7 +200,7 @@ python3 gemini_api_caller.py \
 The converters and API caller support recursive folder processing:
 
 ```
-claude_request/
+claude_requests/
 ├── request_1.json
 ├── request_2.json
 ├── subfolder_1/

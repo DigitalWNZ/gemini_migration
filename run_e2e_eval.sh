@@ -27,8 +27,8 @@ echo ""
 
 # Run Gemini API caller with different configurations
 echo "1. Running FC1 mode (cloud-llm-preview1, function-call-mode: auto)..."
-python gemini_api_caller.py --input-folder claude_request_to_gemini \
-                           --output-folder claude_request_to_gemini_output_FC1 \
+python gemini_api_caller.py --input-folder claude_requests_to_gemini \
+                           --output-folder claude_requests_to_gemini_output_FC1 \
                            --iterations $ITERATIONS \
                            --function-call-mode auto \
                            --fc2 false \
@@ -40,8 +40,8 @@ python gemini_api_caller.py --input-folder claude_request_to_gemini \
 
 echo ""
 echo "2. Running FC2 mode (cloud-llm-preview4, function-call-mode: auto)..."
-python gemini_api_caller.py --input-folder claude_request_to_gemini \
-                           --output-folder claude_request_to_gemini_output_FC2 \
+python gemini_api_caller.py --input-folder claude_requests_to_gemini \
+                           --output-folder claude_requests_to_gemini_output_FC2 \
                            --iterations $ITERATIONS \
                            --function-call-mode auto \
                            --fc2 true \
@@ -53,8 +53,8 @@ python gemini_api_caller.py --input-folder claude_request_to_gemini \
 
 echo ""
 echo "3. Running FC2 validated mode (cloud-llm-preview4, function-call-mode: validated)..."
-python gemini_api_caller.py --input-folder claude_request_to_gemini \
-                           --output-folder claude_request_to_gemini_output_FC2_validate \
+python gemini_api_caller.py --input-folder claude_requests_to_gemini \
+                           --output-folder claude_requests_to_gemini_output_FC2_validate \
                            --iterations $ITERATIONS \
                            --function-call-mode validated \
                            --fc2 true \
@@ -70,6 +70,6 @@ echo "All tests completed successfully!"
 echo "=========================================="
 echo ""
 echo "Results saved to:"
-echo "  - claude_request_to_gemini_output_FC1/"
-echo "  - claude_request_to_gemini_output_FC2/"
-echo "  - claude_request_to_gemini_output_FC2_validate/"
+echo "  - claude_requests_to_gemini_output_FC1/"
+echo "  - claude_requests_to_gemini_output_FC2/"
+echo "  - claude_requests_to_gemini_output_FC2_validate/"

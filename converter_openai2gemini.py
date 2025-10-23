@@ -409,8 +409,8 @@ class OpenAIToGeminiConverter:
 def main():
     """Process all JSON files in the specified input folder."""
     parser = argparse.ArgumentParser(description='Convert OpenAI API requests to Gemini format')
-    parser.add_argument('--input_folder', type=str, default='openai_request',
-                        help='Input folder containing OpenAI request JSON files (default: openai_request)')
+    parser.add_argument('--input_folder', type=str, default='openai_requests',
+                        help='Input folder containing OpenAI request JSON files (default: openai_requests)')
     parser.add_argument('--output_folder', type=str, default=None,
                         help='Output folder for converted files (default: <input_folder>_to_gemini)')
 

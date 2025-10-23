@@ -414,8 +414,8 @@ class ClaudeToOpenAIConverter:
 def main():
     """Process all JSON files in the specified input folder."""
     parser = argparse.ArgumentParser(description='Convert Claude API requests to OpenAI format')
-    parser.add_argument('--input_folder', type=str, default='claude_request',
-                        help='Input folder containing Claude request JSON files (default: claude_request)')
+    parser.add_argument('--input_folder', type=str, default='claude_requests',
+                        help='Input folder containing Claude request JSON files (default: claude_requests)')
     parser.add_argument('--output_folder', type=str, default=None,
                         help='Output folder for converted files (default: <input_folder>_to_openai)')
 

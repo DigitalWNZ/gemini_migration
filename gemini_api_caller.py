@@ -443,9 +443,9 @@ def main():
     """Main function to process Gemini requests."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Process Gemini API requests')
-    parser.add_argument('--input-folder', default="claude_request_to_gemini",
+    parser.add_argument('--input-folder', default="claude_requests_to_gemini",
                         help='Input folder containing Gemini request JSON files')
-    parser.add_argument('--output-folder', default="claude_request_to_gemini_output",
+    parser.add_argument('--output-folder', default="claude_requests_to_gemini_output",
                         help='Output folder for results')
     parser.add_argument('--iterations', type=int, default=1,
                         help='Number of iterations to process all requests')
