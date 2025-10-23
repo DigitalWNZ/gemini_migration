@@ -1,0 +1,61 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "How is the current weather?"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_fu6au6uj",
+          "type": "function",
+          "function": {
+            "name": "get_current_weather",
+            "arguments": "{\"format\":\"fahrenheit\",\"location\":\"Graz, Austria\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": "{\"city\":\"Graz\",\"weather\":\"30°C\"}",
+      "tool_call_id": "call_fu6au6uj"
+    }
+  ],
+  "parallel_tool_calls": false,
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_current_weather",
+        "description": "Get the current weather",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and country, eg. San Francisco, USA"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "celsius",
+                "fahrenheit"
+              ]
+            }
+          },
+          "required": [
+            "location",
+            "format"
+          ]
+        }
+      }
+    }
+  ]
+}
